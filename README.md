@@ -25,7 +25,7 @@ The kinematic model includes the vehicle's:
 * `x` and `y` coordinates
 * orientation angle / heading direction (`psi`)
 * velocity
-* cross-track error (`cte`) and psi error (`epsi`).
+* cross-track error (`cte`) and psi error (`epsi`)
 
 `Lf` is defined as the distance between the car's front and rear wheels.
 
@@ -36,16 +36,17 @@ The actuator outputs are:
 The model combines the state and actuations from the previous timestep to calculate the next state based on the following functions:
 
 <div>
-  <img src="/images/modal.png" height="500">
+  <img src="/src/images/model.png" height="500">
 </div>
+
 
 The objective is to find the `a` and the `delta` that minimizes the errors (based on various factors).
 
 # Timestep Length and Elapsed Duration
 
-The number of points(N) and the time interval(dt) define the prediction horizon, which is set to 10 and 0.1 respectively.
-This means that the prediction polynomial is fitted to these N points, every dt second.
-If you increase N, or decrease dt, the performance descreases, and the inverse leads to erratic behaviour.
+The number of points (`N`) and the time interval (`dt`) define the prediction horizon, which is set to 10 and 0.1 respectively.
+This means that the prediction polynomial is fitted to these `N` points, every `dt` second.
+If you increase `N`, or decrease `dt`, the performance descreases, and the inverse leads to erratic behaviour.
 
 # Polynomial Fitting and MPC Preprocessing
 
