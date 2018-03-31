@@ -18,8 +18,6 @@ double dt = 0.1;
 // Lf was tuned until the the radius formed by the simulating the model
 // presented in the classroom matched the previous radius.
 //
-// This is the length from front to CoG that has a similar radius.
-const double Lf = 2.67;
 
 // Set desired speed for the cost function (i.e. max speed)
 const double ref_v = 100;
@@ -35,6 +33,7 @@ const size_t a_start     = delta_start + N - 1;
 
 class FG_eval {
  public:
+  MPC mpc;
   // Fitted polynomial coefficients
   Eigen::VectorXd coeffs;
   FG_eval(Eigen::VectorXd coeffs) { this->coeffs = coeffs; }
@@ -49,13 +48,13 @@ class FG_eval {
     fg[0] = 0;
     
     // Weights for how "important" each cost is - can be tuned.
-    const int cte_cost_weight = 1000;
-    const int epsi_cost_weight = 1000;
-    const int v_cost_weight = 1;
-    const int delta_cost_weight = 50;
-    const int a_cost_weight = 50;
+    const int cte_cost_weight          = 1000;
+    const int epsi_cost_weight         = 1000;
+    const int v_cost_weight            = 1;
+    const int delta_cost_weight        = 50;
+    const int a_cost_weight            = 50;
     const int delta_change_cost_weight = 250000;
-    const int a_change_cost_weight = 5000;
+    const int a_change_cost_weight     = 5000;
     
     // Cost for CTE, psi error and velocity - reference state.
     for (size_t t = 0; t < N; t++) {
@@ -104,20 +103,20 @@ class FG_eval {
       AD<double> cte0  = vars[cte_start + t - 1];
       AD<double> epsi0 = vars[epsi_start + t - 1];
       
-      // Actuator constraints at time t only.
-      AD<double> delta0   = vars[delta_start + t - 1];
-      AD<double> a0       = vars[a_start + t - 1];
+      // Actuator constraints.
+      AD<double> delta   = vars[delta_start + t - 1];
+      AD<double> a       = vars[a_start + t - 1];
       
-      AD<double> f0       = coeffs[0] + coeffs[1] * x0 + coeffs[2] * pow(x0, 2) + coeffs[3] * pow(x0, 3);
-      AD<double> psi_des0 = CppAD::atan(coeffs[1] + 2 * coeffs[2] * x0 + 3 * coeffs[3] * pow(x0,2));
+      AD<double> f       = coeffs[0] + coeffs[1] * x0 + coeffs[2] * pow(x0, 2) + coeffs[3] * pow(x0, 3);
+      AD<double> psi_des = CppAD::atan(coeffs[1] + 2 * coeffs[2] * x0 + 3 * coeffs[3] * pow(x0,2));
       
       // Setting up the rest of the model constraints.
       fg[1 + x_start + t]    = x1 - (x0 + v0 * CppAD::cos(psi0) * dt);
       fg[1 + y_start + t]    = y1 - (y0 + v0 * CppAD::sin(psi0) * dt);
-      fg[1 + psi_start + t]  = psi1 - (psi0 - v0 * delta0 / Lf * dt);
-      fg[1 + v_start + t]    = v1 - (v0 + a0 * dt);
-      fg[1 + cte_start + t]  = cte1 - ((f0-y0) + (v0 * CppAD::sin(epsi0) * dt));
-      fg[1 + epsi_start + t] = epsi1 - ((psi0 - psi_des0) - v0 * delta0 / Lf * dt);
+      fg[1 + psi_start + t]  = psi1 - (psi0 - v0 * delta / mpc.Lf * dt);
+      fg[1 + v_start + t]    = v1 - (v0 + a * dt);
+      fg[1 + cte_start + t]  = cte1 - ((f - y0) + (v0 * CppAD::sin(epsi0) * dt));
+      fg[1 + epsi_start + t] = epsi1 - ((psi0 - psi_des) - v0 * delta / mpc.Lf * dt);
     }
   }
 };
@@ -171,8 +170,8 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
    // The upper and lower limits of delta are set to -25 and 25
   // degrees (values in radians).
   for (size_t i = delta_start; i < a_start; i++) {
-    vars_lowerbound[i] = -0.436332 * Lf;;
-    vars_upperbound[i] =  0.436332 * Lf;;
+    vars_lowerbound[i] = -0.436332 * this->Lf;
+    vars_upperbound[i] =  0.436332 * this->Lf;
   }
   
   // Acceleration/decceleration upper and lower limits - actuator.
@@ -248,8 +247,10 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   // creates a 2 element double vector.
    // Return the first actuator values, along with predicted x and y values to plot in the simulator.
   vector<double> result;
+
   result.push_back(solution.x[delta_start]);
   result.push_back(solution.x[a_start]);
+
   for (size_t i = 0; i < N; ++i) {
     result.push_back(solution.x[x_start + i]);
     result.push_back(solution.x[y_start + i]);

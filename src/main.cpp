@@ -87,15 +87,15 @@ int main() {
           // j[1] is the data JSON object
           vector<double> ptsx = j[1]["ptsx"];
           vector<double> ptsy = j[1]["ptsy"];
-          double px = j[1]["x"];
-          double py = j[1]["y"];
-          double psi = j[1]["psi"];
-          double v = j[1]["speed"];
-          double delta= j[1]["steering_angle"];
-          double a = j[1]["throttle"];
+          double px    = j[1]["x"];
+          double py    = j[1]["y"];
+          double psi   = j[1]["psi"];
+          double v     = j[1]["speed"];
+          double delta = j[1]["steering_angle"];
+          double a     = j[1]["throttle"];
 
           /*
-          * TODO: Calculate steering angle and throttle using MPC.
+          * Calculate steering angle and throttle using MPC.
           *
           * Both are in between [-1, 1].
           *
@@ -104,39 +104,38 @@ int main() {
           // Preprocessing.
           // Transforms waypoints coordinates to the cars coordinates.
           size_t n_waypoints = ptsx.size();
-          auto ptsx_transformed = Eigen::VectorXd(n_waypoints);
-          auto ptsy_transformed = Eigen::VectorXd(n_waypoints);
-          for (unsigned int i = 0; i < n_waypoints; i++ ) {
-            double dX = ptsx[i] - px;
-            double dY = ptsy[i] - py;
-            double minus_psi = 0.0 - psi;
-            ptsx_transformed( i ) = dX * cos( minus_psi ) - dY * sin( minus_psi );
-            ptsy_transformed( i ) = dX * sin( minus_psi ) + dY * cos( minus_psi );
+          auto waypoints_x = Eigen::VectorXd(n_waypoints);
+          auto waypoints_y = Eigen::VectorXd(n_waypoints);
+    
+          for (size_t i = 0; i < n_waypoints; i++ ) {
+            double dx = ptsx[i] - px;
+            double dy = ptsy[i] - py;
+            waypoints_x(i) = dx * cos(-psi) - dy * sin(-psi);
+            waypoints_y(i) = dx * sin(-psi) + dy * cos(-psi);
           }
 
           // Fit polynomial to the points - 3rd order.
-          auto coeffs = polyfit(ptsx_transformed, ptsy_transformed, 3);
+          auto coeffs = polyfit(waypoints_x, waypoints_y, 3);
 
-          // Actuator delay in milliseconds.
-          const int actuatorDelay =  100;
+          const int millisecond_delay = 100;
 
           // Actuator delay in seconds.
-          const double delay = actuatorDelay / 1000.0;
+          const double delay = millisecond_delay / 1000.0;
 
           // Initial state.
-          const double x0 = 0;
-          const double y0 = 0;
-          const double psi0 = 0;
-          const double cte0 = coeffs[0];
+          const double x0    = 0;
+          const double y0    = 0;
+          const double psi0  = 0;
+          const double cte0  = coeffs[0];
           const double epsi0 = -atan(coeffs[1]);
 
           // State after delay.
-          double x_delay = x0 + ( v * cos(psi0) * delay );
-          double y_delay = y0 + ( v * sin(psi0) * delay );
-          double psi_delay = psi0 - ( v * delta * delay / mpc.Lf );
-          double v_delay = v + a * delay;
-          double cte_delay = cte0 + ( v * sin(epsi0) * delay );
-          double epsi_delay = epsi0 - ( v * atan(coeffs[1]) * delay / mpc.Lf );
+          double x_delay    = x0 + (v * cos(psi0) * delay);
+          double y_delay    = y0 + (v * sin(psi0) * delay );
+          double psi_delay  = psi0 - (v * delta * delay / mpc.Lf);
+          double v_delay    = v + a * delay;
+          double cte_delay  = cte0 + (v * sin(epsi0) * delay);
+          double epsi_delay = epsi0 - (v * atan(coeffs[1]) * delay / mpc.Lf);
 
           // Define the state vector.
           Eigen::VectorXd state(6);
@@ -145,7 +144,7 @@ int main() {
           // Find the MPC solution.
           auto vars = mpc.Solve(state, coeffs);
 
-          double steer_value = vars[0]/deg2rad(25);
+          double steer_value = vars[0] / deg2rad(25);
           double throttle_value = vars[1];
 
           json msgJson;
@@ -158,30 +157,30 @@ int main() {
           vector<double> mpc_x_vals;
           vector<double> mpc_y_vals;
 
-          for ( int i = 2; i < vars.size(); i++ ) {
-            if ( i % 2 == 0 ) {
-              mpc_x_vals.push_back( vars[i] );
+          for (size_t i = 2; i < vars.size(); i++) {
+            if (i % 2 == 0) {
+              mpc_x_vals.push_back(vars[i]);
             } else {
-              mpc_y_vals.push_back( vars[i] );
+              mpc_y_vals.push_back(vars[i]);
             }
           }
+  
+          msgJson["mpc_x"] = mpc_x_vals;
+          msgJson["mpc_y"] = mpc_y_vals;
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Green line
-
-          msgJson["mpc_x"] = mpc_x_vals;
-          msgJson["mpc_y"] = mpc_y_vals;
 
           //Display the waypoints/reference line
           vector<double> next_x_vals;
           vector<double> next_y_vals;
 
-          double poly_inc = 2.5;
-          int num_points = 25;
-          for ( int i = 0; i < num_points; i++ ) {
-            double x = poly_inc * i;
-            next_x_vals.push_back( x );
-            next_y_vals.push_back( polyeval(coeffs, x) );
+          double points_inc = 2.5;
+          int points_n      = 25;
+          for (int i = 0; i < points_n; i++) {
+            double x = points_inc * i;
+            next_x_vals.push_back(x);
+            next_y_vals.push_back(polyeval(coeffs, x));
           }
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
@@ -202,7 +201,7 @@ int main() {
           //
           // NOTE: REMEMBER TO SET THIS TO 100 MILLISECONDS BEFORE
           // SUBMITTING.
-          this_thread::sleep_for(chrono::milliseconds(actuatorDelay));
+          this_thread::sleep_for(chrono::milliseconds(millisecond_delay));
           ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
         }
       } else {
