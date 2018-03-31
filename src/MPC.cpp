@@ -167,7 +167,7 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
     vars_upperbound[i] =  1.0e19;
   }
 
-   // The upper and lower limits of delta are set to -25 and 25
+  // The upper and lower limits of delta are set to -25 and 25
   // degrees (values in radians).
   for (size_t i = delta_start; i < a_start; i++) {
     vars_lowerbound[i] = -0.436332 * this->Lf;
